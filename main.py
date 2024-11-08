@@ -10,6 +10,7 @@ file_directory = "data"
 od_s = 900
 do_s = 1800
 batch_size = 100  # Number of files per batch when saving to Parquet
+nu_threads = 4
 
 def process_file(file_name, unprocessed_files):
     # Initialize dictionaries to store results for this file
@@ -132,8 +133,8 @@ def main():
     manager = Manager()
     unprocessed_files = manager.list()
 
-    # Use multiprocessing pool to process files in parallel
-    with Pool() as pool:
+    # Use multiprocessing pool limited to 4 processes to process files in parallel
+    with Pool(processes=nu_threads) as pool:
         # Pass `unprocessed_files` to each process so it can record failures
         results = dict(pool.starmap(process_file, [(file, unprocessed_files) for file in files]))
 
