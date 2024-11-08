@@ -292,29 +292,29 @@ class PulseDetector:
         fig.show()
 
     
-        def detect_all(self, baseline_method="savgol"):
-            # Run all detection methods
-            self.hilbert_envelope_detection()
-            self.autoregressive_model_residuals()
-            self.wavelet_transform_detection()
-            self.short_time_energy_detection()
-            self.savitzky_golay_smoothing()
-            self.teager_kaiser_energy_operator()
-            self.median_filter_gradient()
-            self.differential_detection()
-            self.cusum_detection()
-            self.rms_energy_plateau()
-            self.median_filter_plateau()
-            self.histogram_plateau()
+    def detect_all(self, baseline_method="savgol"):
+        # Run all detection methods
+        self.hilbert_envelope_detection()
+        self.autoregressive_model_residuals()
+        self.wavelet_transform_detection()
+        self.short_time_energy_detection()
+        self.savitzky_golay_smoothing()
+        self.teager_kaiser_energy_operator()
+        self.median_filter_gradient()
+        self.differential_detection()
+        self.cusum_detection()
+        self.rms_energy_plateau()
+        self.median_filter_plateau()
+        self.histogram_plateau()
 
-            # Baseline calculation and filter out peaks below it
-            baseline = self.calculate_baseline(method=baseline_method)
-            self.filter_peaks_above_baseline(baseline)
+        # Baseline calculation and filter out peaks below it
+        baseline = self.calculate_baseline(method=baseline_method)
+        self.filter_peaks_above_baseline(baseline)
 
-            # Run consensus methods
-            self.frequency_consensus()
-            self.clustering_consensus()
+        # Run consensus methods
+        self.frequency_consensus()
+        self.clustering_consensus()
 
-            # Calculate average values for each consensus method and store in detection_results
-            self.calculate_average_per_pulse("Frequency Consensus")
-            self.calculate_average_per_pulse("Clustering Consensus")
+        # Calculate average values for each consensus method and store in detection_results
+        self.calculate_average_per_pulse("Frequency Consensus")
+        self.calculate_average_per_pulse("Clustering Consensus")
