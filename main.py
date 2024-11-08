@@ -1,7 +1,7 @@
 import os
 import bioread
 import pandas as pd
-from multiprocessing import Pool
+from multiprocessing import Pool, Manager
 from Peaker import PulseDetector
 
 # Define the directory containing the files
@@ -10,7 +10,7 @@ file_directory = "data"
 od_s = 900
 do_s = 1800
 
-def process_file(file_name):
+def process_file(file_name, unprocessed_files):
     # Initialize dictionaries to store results for this file
     file_results = {
         "results_tok_all": None,
@@ -21,54 +21,71 @@ def process_file(file_name):
     
     # Check if the file ends with '.acq'
     if not file_name.endswith('.acq'):
-        return file_results  # Return empty results for non-matching files
+        return file_name, file_results  # Return empty results for non-matching files
 
     # Construct the full file path
     file_path = os.path.join(file_directory, file_name)
 
-    # Read the .acq file using bioread
-    data = bioread.read_file(file_path)
+    try:
+        # Read the .acq file using bioread
+        data = bioread.read_file(file_path)
 
-    # Iterate through channels and process only necessary data
-    for channel in data.channels:
-        if channel.name == 'Napetost':
-            time_intervals = channel.time_index[1] - channel.time_index[0]
-            sample_rate = int(round(1.0 / time_intervals, 2))
+        # Iterate through channels and process only necessary data
+        for channel in data.channels:
+            if channel.name == 'Napetost':
+                time_intervals = channel.time_index[1] - channel.time_index[0]
+                sample_rate = int(round(1.0 / time_intervals, 2))
 
-            # Slice and limit data loading to necessary segments
-            napetost = channel.data[int(od_s * sample_rate):int(do_s * sample_rate)]
-            
-            # Detect pulses in 'Napetost'
-            print(f"extracting values for napetost in file {file_name}")
-            pulse_detector_napetost = PulseDetector(napetost)
-            pulse_detector_napetost.detect_all(baseline_method="savgol")
-            napetost_avg_x, napetost_avg_y = pulse_detector_napetost.detection_results["Clustering Consensus Averages"]
-            napetost_wave_y = pulse_detector_napetost.detection_results["Wavelet Transform Detection"]
+                # Check if the signal segment is long enough for processing
+                if len(channel.data) < int(do_s * sample_rate):
+                    raise ValueError("File is too short for analysis")
 
-            # Store results in the file-specific dictionary
-            file_results["results_napetost_all"] = (napetost_avg_x, napetost_avg_y)
-            file_results["results_napetost_wavelet"] = napetost_wave_y
-            del pulse_detector_napetost  # Free memory
+                # Slice and limit data loading to necessary segments
+                napetost = channel.data[int(od_s * sample_rate):int(do_s * sample_rate)]
+                
+                # Detect pulses in 'Napetost'
+                print(f"extracting values for napetost in file {file_name}")
+                pulse_detector_napetost = PulseDetector(napetost)
+                pulse_detector_napetost.detect_all(baseline_method="savgol")
+                napetost_avg_x, napetost_avg_y = pulse_detector_napetost.detection_results["Clustering Consensus Averages"]
+                napetost_wave_y = pulse_detector_napetost.detection_results["Wavelet Transform Detection"]
 
-        elif channel.name == 'Tok':
-            time_intervals = channel.time_index[1] - channel.time_index[0]
-            sample_rate = int(round(1.0 / time_intervals, 2))
+                # Store results in the file-specific dictionary
+                file_results["results_napetost_all"] = (napetost_avg_x, napetost_avg_y)
+                file_results["results_napetost_wavelet"] = napetost_wave_y
+                del pulse_detector_napetost  # Free memory
 
-            tok = -channel.data[int(od_s * sample_rate):int(do_s * sample_rate)]
-            
-            # Detect pulses in 'Tok'
-            print(f"extracting values for tok in file {file_name}")
-            pulse_detector_tok = PulseDetector(tok)
-            pulse_detector_tok.detect_all(baseline_method="savgol")
-            tok_avg_x, tok_avg_y = pulse_detector_tok.detection_results["Clustering Consensus Averages"]
-            tok_wave_y = pulse_detector_tok.detection_results["Wavelet Transform Detection"]
+            elif channel.name == 'Tok':
+                time_intervals = channel.time_index[1] - channel.time_index[0]
+                sample_rate = int(round(1.0 / time_intervals, 2))
 
-            # Store results in the file-specific dictionary
-            file_results["results_tok_all"] = (tok_avg_x, tok_avg_y)
-            file_results["results_tok_wavelet"] = tok_wave_y
-            del pulse_detector_tok  # Free memory
+                # Check if the signal segment is long enough for processing
+                if len(channel.data) < int(do_s * sample_rate):
+                    raise ValueError("File is too short for analysis")
 
-    return (file_name, file_results)
+                tok = -channel.data[int(od_s * sample_rate):int(do_s * sample_rate)]
+                
+                # Detect pulses in 'Tok'
+                print(f"extracting values for tok in file {file_name}")
+                pulse_detector_tok = PulseDetector(tok)
+                pulse_detector_tok.detect_all(baseline_method="savgol")
+                tok_avg_x, tok_avg_y = pulse_detector_tok.detection_results["Clustering Consensus Averages"]
+                tok_wave_y = pulse_detector_tok.detection_results["Wavelet Transform Detection"]
+
+                # Store results in the file-specific dictionary
+                file_results["results_tok_all"] = (tok_avg_x, tok_avg_y)
+                file_results["results_tok_wavelet"] = tok_wave_y
+                del pulse_detector_tok  # Free memory
+
+    except ValueError as e:
+        print(f"Could not analyze file {file_name}: {e}")
+        unprocessed_files.append(file_name)  # Track unprocessed files
+    except Exception as e:
+        print(f"An error occurred with file {file_name}: {e}")
+        unprocessed_files.append(file_name)  # Track unprocessed files
+
+    return file_name, file_results
+
 
 def save_results_to_csv(results):
     # Convert results to separate dictionaries
@@ -110,12 +127,25 @@ def main():
     # Get list of all files in directory
     files = [f for f in os.listdir(file_directory) if f.endswith('.acq')]
 
+    # Shared list to track files that couldn't be processed
+    manager = Manager()
+    unprocessed_files = manager.list()
+
     # Use multiprocessing pool to process files in parallel
     with Pool() as pool:
-        results = dict(pool.map(process_file, files))
+        # Pass `unprocessed_files` to each process so it can record failures
+        results = dict(pool.starmap(process_file, [(file, unprocessed_files) for file in files]))
 
     # Save results to CSV files
     save_results_to_csv(results)
+
+    # Print summary of unprocessed files
+    if unprocessed_files:
+        print("\nFiles that could not be analyzed:")
+        for file_name in unprocessed_files:
+            print(file_name)
+    else:
+        print("\nAll files were processed successfully.")
 
 if __name__ == "__main__":
     main()
