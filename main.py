@@ -91,10 +91,10 @@ def process_file(file_name, unprocessed_files):
 
 def save_results_to_parquet(results, batch_number):
     # Convert results to separate DataFrames and save in Parquet format
-    results_napetost_all_dict = {file_name: res["results_napetost_all"] for file_name, res in results.items() if res["results_napetost_all"]}
-    results_tok_all_dict = {file_name: res["results_tok_all"] for file_name, res in results.items() if res["results_tok_all"]}
-    results_napetost_wavelet_dict = {file_name: res["results_napetost_wavelet"] for file_name, res in results.items() if res["results_napetost_wavelet"]}
-    results_tok_wavelet_dict = {file_name: res["results_tok_wavelet"] for file_name, res in results.items() if res["results_tok_wavelet"]}
+    results_napetost_all_dict = {file_name: res["results_napetost_all"] for file_name, res in results.items() if res["results_napetost_all"] is not None}
+    results_tok_all_dict = {file_name: res["results_tok_all"] for file_name, res in results.items() if res["results_tok_all"] is not None}
+    results_napetost_wavelet_dict = {file_name: res["results_napetost_wavelet"] for file_name, res in results.items() if res["results_napetost_wavelet"] is not None and len(res["results_napetost_wavelet"]) > 0}
+    results_tok_wavelet_dict = {file_name: res["results_tok_wavelet"] for file_name, res in results.items() if res["results_tok_wavelet"] is not None and len(res["results_tok_wavelet"]) > 0}
 
     if results_napetost_all_dict:
         napetost_all_df = pd.DataFrame({
@@ -123,7 +123,6 @@ def save_results_to_parquet(results, batch_number):
             for file_name, y_val in results_tok_wavelet_dict.items()
         }).T.explode('tok_wave_y')
         tok_wavelet_df.to_parquet(f"results_tok_wavelet_batch_{batch_number}.parquet")
-
 
 def main():
     # Get list of all files in directory
