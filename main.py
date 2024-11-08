@@ -10,7 +10,7 @@ file_directory = "data"
 od_s = 900
 do_s = 1800
 batch_size = 100  # Number of files per batch when saving to Parquet
-nu_threads = 4
+nu_threads = 7
 
 def process_file(file_name, unprocessed_files):
     # Initialize dictionaries to store results for this file
