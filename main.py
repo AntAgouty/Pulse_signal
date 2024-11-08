@@ -1,6 +1,7 @@
 import os
 import bioread
 import pandas as pd
+from multiprocessing import Pool
 from Peaker import PulseDetector
 
 # Define the directory containing the files
@@ -9,24 +10,24 @@ file_directory = "data"
 od_s = 900
 do_s = 1800
 
-# Dictionaries to store results
-results_tok_all_dict = {}
-results_napetost_all_dict = {}
-results_tok_wavelet_dict = {}
-results_napetost_wavelet_dict = {}
-
 def process_file(file_name):
+    # Initialize dictionaries to store results for this file
+    file_results = {
+        "results_tok_all": None,
+        "results_napetost_all": None,
+        "results_tok_wavelet": None,
+        "results_napetost_wavelet": None
+    }
+    
     # Check if the file ends with '.acq'
     if not file_name.endswith('.acq'):
-        return  # Skip non .acq files
+        return file_results  # Return empty results for non-matching files
 
     # Construct the full file path
     file_path = os.path.join(file_directory, file_name)
 
     # Read the .acq file using bioread
     data = bioread.read_file(file_path)
-    napetost = None
-    tok = None
 
     # Iterate through channels and process only necessary data
     for channel in data.channels:
@@ -44,9 +45,9 @@ def process_file(file_name):
             napetost_avg_x, napetost_avg_y = pulse_detector_napetost.detection_results["Clustering Consensus Averages"]
             napetost_wave_y = pulse_detector_napetost.detection_results["Wavelet Transform Detection"]
 
-            # Store results
-            results_napetost_all_dict[file_name] = (napetost_avg_x, napetost_avg_y)
-            results_napetost_wavelet_dict[file_name] = napetost_wave_y
+            # Store results in the file-specific dictionary
+            file_results["results_napetost_all"] = (napetost_avg_x, napetost_avg_y)
+            file_results["results_napetost_wavelet"] = napetost_wave_y
             del pulse_detector_napetost  # Free memory
 
         elif channel.name == 'Tok':
@@ -62,50 +63,59 @@ def process_file(file_name):
             tok_avg_x, tok_avg_y = pulse_detector_tok.detection_results["Clustering Consensus Averages"]
             tok_wave_y = pulse_detector_tok.detection_results["Wavelet Transform Detection"]
 
-            # Store results
-            results_tok_all_dict[file_name] = (tok_avg_x, tok_avg_y)
-            results_tok_wavelet_dict[file_name] = tok_wave_y
+            # Store results in the file-specific dictionary
+            file_results["results_tok_all"] = (tok_avg_x, tok_avg_y)
+            file_results["results_tok_wavelet"] = tok_wave_y
             del pulse_detector_tok  # Free memory
 
-def save_results_to_csv():
-    # Convert results_napetost_all_dict to DataFrame and save
-    napetost_all_df = pd.DataFrame({
-        file_name: {"napetost_x": x_val, "napetost_y": y_val}
-        for file_name, (x_val, y_val) in results_napetost_all_dict.items()
-    }).T.explode(['napetost_x', 'napetost_y'])
-    napetost_all_df.to_csv("results_napetost_all_dict.csv", index_label="File")
+    return (file_name, file_results)
 
-    # Convert results_tok_all_dict to DataFrame and save
-    tok_all_df = pd.DataFrame({
-        file_name: {"tok_x": x_val, "tok_y": y_val}
-        for file_name, (x_val, y_val) in results_tok_all_dict.items()
-    }).T.explode(['tok_x', 'tok_y'])
-    tok_all_df.to_csv("results_tok_all_dict.csv", index_label="File")
+def save_results_to_csv(results):
+    # Convert results to separate dictionaries
+    results_napetost_all_dict = {file_name: res["results_napetost_all"] for file_name, res in results.items() if res["results_napetost_all"]}
+    results_tok_all_dict = {file_name: res["results_tok_all"] for file_name, res in results.items() if res["results_tok_all"]}
+    results_napetost_wavelet_dict = {file_name: res["results_napetost_wavelet"] for file_name, res in results.items() if res["results_napetost_wavelet"]}
+    results_tok_wavelet_dict = {file_name: res["results_tok_wavelet"] for file_name, res in results.items() if res["results_tok_wavelet"]}
 
-    # Convert results_napetost_wavelet_dict to DataFrame and save
-    napetost_wavelet_df = pd.DataFrame({
-        file_name: {"napetost_wave_y": y_val}
-        for file_name, y_val in results_napetost_wavelet_dict.items()
-    }).T.explode('napetost_wave_y')
-    napetost_wavelet_df.to_csv("results_napetost_wavelet_dict.csv", index_label="File")
+    # Save each result dictionary to a CSV
+    if results_napetost_all_dict:
+        napetost_all_df = pd.DataFrame({
+            file_name: {"napetost_x": x_val, "napetost_y": y_val}
+            for file_name, (x_val, y_val) in results_napetost_all_dict.items()
+        }).T.explode(['napetost_x', 'napetost_y'])
+        napetost_all_df.to_csv("results_napetost_all_dict.csv", index_label="File")
 
-    # Convert results_tok_wavelet_dict to DataFrame and save
-    tok_wavelet_df = pd.DataFrame({
-        file_name: {"tok_wave_y": y_val}
-        for file_name, y_val in results_tok_wavelet_dict.items()
-    }).T.explode('tok_wave_y')
-    tok_wavelet_df.to_csv("results_tok_wavelet_dict.csv", index_label="File")
+    if results_tok_all_dict:
+        tok_all_df = pd.DataFrame({
+            file_name: {"tok_x": x_val, "tok_y": y_val}
+            for file_name, (x_val, y_val) in results_tok_all_dict.items()
+        }).T.explode(['tok_x', 'tok_y'])
+        tok_all_df.to_csv("results_tok_all_dict.csv", index_label="File")
+
+    if results_napetost_wavelet_dict:
+        napetost_wavelet_df = pd.DataFrame({
+            file_name: {"napetost_wave_y": y_val}
+            for file_name, y_val in results_napetost_wavelet_dict.items()
+        }).T.explode('napetost_wave_y')
+        napetost_wavelet_df.to_csv("results_napetost_wavelet_dict.csv", index_label="File")
+
+    if results_tok_wavelet_dict:
+        tok_wavelet_df = pd.DataFrame({
+            file_name: {"tok_wave_y": y_val}
+            for file_name, y_val in results_tok_wavelet_dict.items()
+        }).T.explode('tok_wave_y')
+        tok_wavelet_df.to_csv("results_tok_wavelet_dict.csv", index_label="File")
 
 def main():
     # Get list of all files in directory
     files = [f for f in os.listdir(file_directory) if f.endswith('.acq')]
 
-    # Sequentially process each file without parallelization
-    for file_name in files:
-        process_file(file_name)
+    # Use multiprocessing pool to process files in parallel
+    with Pool() as pool:
+        results = dict(pool.map(process_file, files))
 
     # Save results to CSV files
-    save_results_to_csv()
+    save_results_to_csv(results)
 
 if __name__ == "__main__":
     main()

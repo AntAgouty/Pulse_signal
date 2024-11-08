@@ -1,0 +1,9 @@
+pandas
+numpy
+scipy
+plotly
+scikit-learn
+statsmodels
+bioread
+nbformat
+PyWavelets

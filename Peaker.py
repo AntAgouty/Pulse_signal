@@ -7,7 +7,6 @@ import pywt
 from scipy.cluster.hierarchy import fclusterdata
 from collections import Counter
 import gc
-import time
 
 class PulseDetector:
     def __init__(self, signal, sample_rate=50000):
@@ -293,40 +292,29 @@ class PulseDetector:
         fig.show()
 
     
-    def detect_all(self, baseline_method="savgol"):
-    # Helper function to measure and print execution time for each step
-        def timed_execution(method_name, method):
-            start_time = time.time()
-            method()
-            end_time = time.time()
-            print(f"{method_name} took {end_time - start_time:.4f} seconds")
+        def detect_all(self, baseline_method="savgol"):
+            # Run all detection methods
+            self.hilbert_envelope_detection()
+            self.autoregressive_model_residuals()
+            self.wavelet_transform_detection()
+            self.short_time_energy_detection()
+            self.savitzky_golay_smoothing()
+            self.teager_kaiser_energy_operator()
+            self.median_filter_gradient()
+            self.differential_detection()
+            self.cusum_detection()
+            self.rms_energy_plateau()
+            self.median_filter_plateau()
+            self.histogram_plateau()
 
-        # Run all detection methods with time tracking
-        timed_execution("Hilbert Envelope Detection", self.hilbert_envelope_detection)
-        timed_execution("Autoregressive Model Residuals", self.autoregressive_model_residuals)
-        timed_execution("Wavelet Transform Detection", self.wavelet_transform_detection)
-        timed_execution("Short-Time Energy Detection", self.short_time_energy_detection)
-        timed_execution("Savitzky-Golay Smoothing", self.savitzky_golay_smoothing)
-        timed_execution("Teager-Kaiser Energy Operator", self.teager_kaiser_energy_operator)
-        timed_execution("Median Filter Gradient", self.median_filter_gradient)
-        timed_execution("Differential Detection", self.differential_detection)
-        timed_execution("CUSUM Detection", self.cusum_detection)
-        timed_execution("RMS Energy Plateau", self.rms_energy_plateau)
-        timed_execution("Median Filter Plateau", self.median_filter_plateau)
-        timed_execution("Histogram Plateau", self.histogram_plateau)
+            # Baseline calculation and filter out peaks below it
+            baseline = self.calculate_baseline(method=baseline_method)
+            self.filter_peaks_above_baseline(baseline)
 
-        # Baseline calculation and filtering with time tracking
-        start_time = time.time()
-        baseline = self.calculate_baseline(method=baseline_method)
-        end_time = time.time()
-        print(f"Baseline Calculation took {end_time - start_time:.4f} seconds")
+            # Run consensus methods
+            self.frequency_consensus()
+            self.clustering_consensus()
 
-        timed_execution("Filtering Peaks Above Baseline", lambda: self.filter_peaks_above_baseline(baseline))
-
-        # Consensus methods with time tracking
-        timed_execution("Frequency Consensus", self.frequency_consensus)
-        timed_execution("Clustering Consensus", self.clustering_consensus)
-
-        # Calculate averages for consensus methods
-        timed_execution("Calculating Averages for Frequency Consensus", lambda: self.calculate_average_per_pulse("Frequency Consensus"))
-        timed_execution("Calculating Averages for Clustering Consensus", lambda: self.calculate_average_per_pulse("Clustering Consensus"))
+            # Calculate average values for each consensus method and store in detection_results
+            self.calculate_average_per_pulse("Frequency Consensus")
+            self.calculate_average_per_pulse("Clustering Consensus")
