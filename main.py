@@ -28,69 +28,62 @@ def process_file(file_name, unprocessed_files):
     # Construct the full file path
     file_path = os.path.join(file_directory, file_name)
 
-    try:
-        # Read the .acq file using bioread
-        data = bioread.read_file(file_path)
+    # Read the .acq file using bioread
+    data = bioread.read_file(file_path)
 
-        # Iterate through channels and process only necessary data
-        for channel in data.channels:
-            if channel.name == 'Napetost':
-                time_intervals = channel.time_index[1] - channel.time_index[0]
-                sample_rate = int(round(1.0 / time_intervals, 2))
+    # Iterate through channels and process only necessary data
+    for channel in data.channels:
+        if channel.name == 'Napetost':
+            time_intervals = channel.time_index[1] - channel.time_index[0]
+            sample_rate = int(round(1.0 / time_intervals, 2))
 
-                # Check if the signal segment is long enough for processing
-                if len(channel.data) < int(do_s * sample_rate):
-                    raise ValueError("File is too short for analysis")
+            # Check if the signal segment is long enough for processing
+            if len(channel.data) < int(do_s * sample_rate):
+                raise ValueError("File is too short for analysis")
 
-                # Slice and limit data loading to necessary segments
-                napetost = channel.data[int(od_s * sample_rate):int(do_s * sample_rate)]
-                
-                # Detect pulses in 'Napetost'
-                print(f"extracting values for napetost in file {file_name}")
-                pulse_detector_napetost = PulseDetector(napetost)
-                pulse_detector_napetost.detect_all(baseline_method="savgol")
-                napetost_avg_x, napetost_avg_y = pulse_detector_napetost.detection_results["Clustering Consensus Averages"]
-                
-                # Get both x and y for Wavelet Transform Detection
-                napetost_wave_x, napetost_wave_y = pulse_detector_napetost.detection_results["Wavelet Transform Detection"]
+            # Slice and limit data loading to necessary segments
+            napetost = channel.data[int(od_s * sample_rate):int(do_s * sample_rate)]
+            
+            # Detect pulses in 'Napetost'
+            print(f"extracting values for napetost in file {file_name}")
+            pulse_detector_napetost = PulseDetector(napetost)
+            pulse_detector_napetost.detect_all(baseline_method="savgol")
+            napetost_avg_x, napetost_avg_y = pulse_detector_napetost.detection_results["Clustering Consensus Averages"]
+            
+            # Get both x and y for Wavelet Transform Detection
+            napetost_wave_x, napetost_wave_y = pulse_detector_napetost.detection_results["Wavelet Transform Detection"]
 
-                # Store results in the file-specific dictionary
-                file_results["results_napetost_all"] = (napetost_avg_x, napetost_avg_y)
-                file_results["results_napetost_wavelet"] = (napetost_wave_x, napetost_wave_y)  # Store both x and y values
+            # Store results in the file-specific dictionary
+            file_results["results_napetost_all"] = (napetost_avg_x, napetost_avg_y)
+            file_results["results_napetost_wavelet"] = (napetost_wave_x, napetost_wave_y)  # Store both x and y values
 
-                del pulse_detector_napetost  # Free memory
+            del pulse_detector_napetost  # Free memory
 
-            elif channel.name == 'Tok':
-                time_intervals = channel.time_index[1] - channel.time_index[0]
-                sample_rate = int(round(1.0 / time_intervals, 2))
+        elif channel.name == 'Tok':
+            time_intervals = channel.time_index[1] - channel.time_index[0]
+            sample_rate = int(round(1.0 / time_intervals, 2))
 
-                # Check if the signal segment is long enough for processing
-                if len(channel.data) < int(do_s * sample_rate):
-                    raise ValueError("File is too short for analysis")
+            # Check if the signal segment is long enough for processing
+            if len(channel.data) < int(do_s * sample_rate):
+                raise ValueError("File is too short for analysis")
 
-                tok = -channel.data[int(od_s * sample_rate):int(do_s * sample_rate)]
-                
-                # Detect pulses in 'Tok'
-                print(f"extracting values for tok in file {file_name}")
-                pulse_detector_tok = PulseDetector(tok)
-                pulse_detector_tok.detect_all(baseline_method="savgol")
-                tok_avg_x, tok_avg_y = pulse_detector_tok.detection_results["Clustering Consensus Averages"]
-                
-                # Get both x and y for Wavelet Transform Detection
-                tok_wave_x, tok_wave_y = pulse_detector_tok.detection_results["Wavelet Transform Detection"]
+            tok = -channel.data[int(od_s * sample_rate):int(do_s * sample_rate)]
+            
+            # Detect pulses in 'Tok'
+            print(f"extracting values for tok in file {file_name}")
+            pulse_detector_tok = PulseDetector(tok)
+            pulse_detector_tok.detect_all(baseline_method="savgol")
+            tok_avg_x, tok_avg_y = pulse_detector_tok.detection_results["Clustering Consensus Averages"]
+            
+            # Get both x and y for Wavelet Transform Detection
+            tok_wave_x, tok_wave_y = pulse_detector_tok.detection_results["Wavelet Transform Detection"]
 
-                # Store results in the file-specific dictionary
-                file_results["results_tok_all"] = (tok_avg_x, tok_avg_y)
-                file_results["results_tok_wavelet"] = (tok_wave_x, tok_wave_y)  # Store both x and y values
+            # Store results in the file-specific dictionary
+            file_results["results_tok_all"] = (tok_avg_x, tok_avg_y)
+            file_results["results_tok_wavelet"] = (tok_wave_x, tok_wave_y)  # Store both x and y values
 
-                del pulse_detector_tok  # Free memory
+            del pulse_detector_tok  # Free memory
 
-    except ValueError as e:
-        print(f"Could not analyze file {file_name}: {e}")
-        unprocessed_files.append(file_name)  # Track unprocessed files
-    except Exception as e:
-        print(f"An error occurred with file {file_name}: {e}")
-        unprocessed_files.append(file_name)  # Track unprocessed files
 
     return file_name, file_results
 
