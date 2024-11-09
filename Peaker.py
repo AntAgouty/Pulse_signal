@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.signal import find_peaks, hilbert, savgol_filter, cwt, ricker, butter, filtfilt
 from scipy.ndimage import median_filter, uniform_filter1d,zoom
-from statsmodels.tsa.ar_model import AutoReg
+from scipy.stats import chisquare
 from plotly import graph_objects as go
 import pywt
 from scipy.cluster.hierarchy import fclusterdata
@@ -14,6 +14,7 @@ class PulseDetector:
         self.signal = signal
         self.sample_rate = sample_rate
         self.detection_results = {}
+        self.is_sham = True #To je nicelna hipoteza ki jo vsakic ko najdemo pulze zavrnemo
         self.colors = [
             'red', 'blue', 'green', 'purple', 'orange', 'cyan', 'magenta', 
             'lime', 'brown', 'pink', 'gold', 'darkblue', 'teal', 'darkgreen',
@@ -292,6 +293,54 @@ class PulseDetector:
         fig.show()
 
     
+    def has_pulses_based_on_gap_distribution(self, min_gap_threshold=5, max_cv=0.3, use_buckets=True):
+        """
+        Determine if pulses are present based on the distribution of gaps between 'Clustering Consensus Averages'.
+        
+        :param min_gap_threshold: Minimum threshold for gap distances to avoid noise influence.
+        :param max_cv: Maximum allowable Coefficient of Variation (CV) for gaps to be considered non-random.
+        :param use_buckets: Whether to use bucketed data and Chi-Square test on binned gaps.
+        :return: True if pulses are likely present, False otherwise.
+        """
+        # Get averaged pulse points from Clustering Consensus Averages
+        avg_x, _ = self.detection_results.get("Clustering Consensus Averages", (np.array([]), np.array([])))
+
+        # Check if there are enough pulses detected to calculate meaningful gaps
+        if len(avg_x) < 3:
+            return False  # Not enough points for meaningful pulse analysis
+
+        # Step 1: Calculate the gaps between consecutive pulses
+        pulse_gaps = np.diff(avg_x)
+
+        # Filter out gaps below a threshold to avoid noise influence
+        pulse_gaps = pulse_gaps[pulse_gaps >= min_gap_threshold]
+        if len(pulse_gaps) < 2:
+            return False  # Not enough valid gaps for a reliable pattern
+
+        # Step 2: Calculate the Coefficient of Variation (CV) for the gaps
+        mean_gap = np.mean(pulse_gaps)
+        std_gap = np.std(pulse_gaps)
+        cv = std_gap / mean_gap if mean_gap > 0 else float('inf')
+
+        # Check if CV is low enough to indicate a structured pattern
+        if cv <= max_cv:
+            return True  # Low CV suggests structured intervals
+
+        # If not using buckets, rely only on the CV check
+        if not use_buckets:
+            return cv <= max_cv
+
+        # Step 3: Use Chi-Square Test on binned data if using buckets
+        # Define a number of bins for the histogram
+        observed_freq, bin_edges = np.histogram(pulse_gaps, bins='auto')
+        expected_freq = np.full_like(observed_freq, np.mean(observed_freq))
+
+        chi2, p_value = chisquare(observed_freq, expected_freq)
+
+        # Step 4: Interpret Chi-Square test result
+        if p_value < 0.05:
+            self.is_sham = False  # Significant p-value suggests non-random gap distribution
+    
     def detect_all(self, baseline_method="savgol"):
         # Run all detection methods
         self.hilbert_envelope_detection()
@@ -318,3 +367,5 @@ class PulseDetector:
         # Calculate average values for each consensus method and store in detection_results
         self.calculate_average_per_pulse("Frequency Consensus")
         self.calculate_average_per_pulse("Clustering Consensus")
+
+        self.has_pulses_based_on_gap_distribution(min_gap_threshold=5, max_cv=0.3, use_buckets=True)
