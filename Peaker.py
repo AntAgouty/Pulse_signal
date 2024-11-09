@@ -79,10 +79,7 @@ class PulseDetector:
         # Step 5: Calculate the adaptive threshold and detect peaks
         adaptive_threshold = np.median(wavelet_coefficients) + 2 * np.std(wavelet_coefficients)
         peaks, _ = find_peaks(wavelet_coefficients, height=adaptive_threshold)
-        
-        # Step 6: Store both peak indices (x) and corresponding amplitudes (y values)
-        peak_y_values = self.signal[peaks]  # get corresponding y values from original signal
-        self.detection_results["Wavelet Transform Detection"] = (peaks, peak_y_values)
+        self.detection_results["Wavelet Transform Detection"] = np.array(peaks, dtype=int)
 
     def short_time_energy_detection(self, window_size=10, step_size=5):
         # Step 1: Create a rolling window view into the signal for the given window size
@@ -172,15 +169,10 @@ class PulseDetector:
         baseline_deviation = self.signal - baseline
         threshold = np.median(baseline_deviation) + 3 * np.std(baseline_deviation)
         filtered_results = {}
-
+        
         for method, detections in self.detection_results.items():
-            # Ensure each detection point `p` is evaluated as a scalar.
-            if isinstance(detections, np.ndarray):
-                filtered_results[method] = np.array([p for p in detections if self.signal[int(p)] > baseline[int(p)] + threshold], dtype=int)
-            else:
-                # Handle cases where detections might not be an array
-                filtered_results[method] = detections
-
+            filtered_results[method] = np.array([p for p in detections if self.signal[p] > baseline[p] + threshold], dtype=int)
+        
         self.detection_results = filtered_results
 
   # Consensus methods (Frequency and Clustering Consensus)
