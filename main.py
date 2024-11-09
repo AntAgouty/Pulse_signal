@@ -12,7 +12,7 @@ do_s = 1800
 batch_size = 100  # Number of files per batch when saving to Parquet
 nu_threads = 6
 
-def process_file(file_name, unprocessed_files, sham_files):
+def process_file(file_name, unprocessed_files):
     # Initialize dictionaries to store results for this file
     file_results = {
         "results_tok_all": None,
@@ -49,15 +49,10 @@ def process_file(file_name, unprocessed_files, sham_files):
                 print(f"extracting values for napetost in file {file_name}")
                 pulse_detector_napetost = PulseDetector(napetost)
                 pulse_detector_napetost.detect_all(baseline_method="savgol")
-                
-                # Check if the file is classified as a sham (no pulses detected)
-                if pulse_detector_napetost.is_sham:
-                    sham_files.append(file_name)  # Record the file as a sham
-                
-                # Store results
                 napetost_avg_x, napetost_avg_y = pulse_detector_napetost.detection_results["Clustering Consensus Averages"]
                 napetost_wave_y = pulse_detector_napetost.detection_results["Wavelet Transform Detection"]
 
+                # Store results in the file-specific dictionary
                 file_results["results_napetost_all"] = (napetost_avg_x, napetost_avg_y)
                 file_results["results_napetost_wavelet"] = napetost_wave_y
                 del pulse_detector_napetost  # Free memory
@@ -76,11 +71,10 @@ def process_file(file_name, unprocessed_files, sham_files):
                 print(f"extracting values for tok in file {file_name}")
                 pulse_detector_tok = PulseDetector(tok)
                 pulse_detector_tok.detect_all(baseline_method="savgol")
-                
-                # Store results
                 tok_avg_x, tok_avg_y = pulse_detector_tok.detection_results["Clustering Consensus Averages"]
                 tok_wave_y = pulse_detector_tok.detection_results["Wavelet Transform Detection"]
 
+                # Store results in the file-specific dictionary
                 file_results["results_tok_all"] = (tok_avg_x, tok_avg_y)
                 file_results["results_tok_wavelet"] = tok_wave_y
                 del pulse_detector_tok  # Free memory
@@ -134,14 +128,14 @@ def main():
     # Get list of all files in directory
     files = [f for f in os.listdir(file_directory) if f.endswith('.acq')]
 
-    # Shared lists to track files that couldn't be processed and sham files
+    # Shared list to track files that couldn't be processed
     manager = Manager()
     unprocessed_files = manager.list()
-    sham_files = manager.list()
 
     # Use multiprocessing pool limited to 4 processes to process files in parallel
     with Pool(processes=nu_threads) as pool:
-        results = dict(pool.starmap(process_file, [(file, unprocessed_files, sham_files) for file in files]))
+        # Pass `unprocessed_files` to each process so it can record failures
+        results = dict(pool.starmap(process_file, [(file, unprocessed_files) for file in files]))
 
     # Save results in batches to Parquet
     batch_number = 1
@@ -161,14 +155,6 @@ def main():
             print(file_name)
     else:
         print("\nAll files were processed successfully.")
-    
-    # Print sham files
-    if sham_files:
-        print("\nFiles classified as sham (no pulses detected):")
-        for file_name in sham_files:
-            print(file_name)
-    else:
-        print("\nNo files were classified as sham.")
 
 if __name__ == "__main__":
     main()
