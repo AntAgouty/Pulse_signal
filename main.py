@@ -50,11 +50,14 @@ def process_file(file_name, unprocessed_files):
                 pulse_detector_napetost = PulseDetector(napetost)
                 pulse_detector_napetost.detect_all(baseline_method="savgol")
                 napetost_avg_x, napetost_avg_y = pulse_detector_napetost.detection_results["Clustering Consensus Averages"]
-                napetost_wave_y = pulse_detector_napetost.detection_results["Wavelet Transform Detection"]
+                
+                # Get both x and y for Wavelet Transform Detection
+                napetost_wave_x, napetost_wave_y = pulse_detector_napetost.detection_results["Wavelet Transform Detection"]
 
                 # Store results in the file-specific dictionary
                 file_results["results_napetost_all"] = (napetost_avg_x, napetost_avg_y)
-                file_results["results_napetost_wavelet"] = napetost_wave_y
+                file_results["results_napetost_wavelet"] = (napetost_wave_x, napetost_wave_y)  # Store both x and y values
+
                 del pulse_detector_napetost  # Free memory
 
             elif channel.name == 'Tok':
@@ -72,11 +75,14 @@ def process_file(file_name, unprocessed_files):
                 pulse_detector_tok = PulseDetector(tok)
                 pulse_detector_tok.detect_all(baseline_method="savgol")
                 tok_avg_x, tok_avg_y = pulse_detector_tok.detection_results["Clustering Consensus Averages"]
-                tok_wave_y = pulse_detector_tok.detection_results["Wavelet Transform Detection"]
+                
+                # Get both x and y for Wavelet Transform Detection
+                tok_wave_x, tok_wave_y = pulse_detector_tok.detection_results["Wavelet Transform Detection"]
 
                 # Store results in the file-specific dictionary
                 file_results["results_tok_all"] = (tok_avg_x, tok_avg_y)
-                file_results["results_tok_wavelet"] = tok_wave_y
+                file_results["results_tok_wavelet"] = (tok_wave_x, tok_wave_y)  # Store both x and y values
+
                 del pulse_detector_tok  # Free memory
 
     except ValueError as e:
@@ -112,16 +118,16 @@ def save_results_to_parquet(results, batch_number):
 
     if results_napetost_wavelet_dict:
         napetost_wavelet_df = pd.DataFrame({
-            file_name: {"napetost_wave_y": y_val}
-            for file_name, y_val in results_napetost_wavelet_dict.items()
-        }).T.explode('napetost_wave_y')
+            file_name: {"napetost_wave_x": x_val, "napetost_wave_y": y_val}
+            for file_name, (x_val, y_val) in results_napetost_wavelet_dict.items()
+        }).T.explode(['napetost_wave_x', 'napetost_wave_y'])
         napetost_wavelet_df.to_parquet(f"results_napetost_wavelet_batch_{batch_number}.parquet")
 
     if results_tok_wavelet_dict:
         tok_wavelet_df = pd.DataFrame({
-            file_name: {"tok_wave_y": y_val}
-            for file_name, y_val in results_tok_wavelet_dict.items()
-        }).T.explode('tok_wave_y')
+            file_name: {"tok_wave_x": x_val, "tok_wave_y": y_val}
+            for file_name, (x_val, y_val) in results_tok_wavelet_dict.items()
+        }).T.explode(['tok_wave_x', 'tok_wave_y'])
         tok_wavelet_df.to_parquet(f"results_tok_wavelet_batch_{batch_number}.parquet")
 
 def main():

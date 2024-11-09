@@ -79,7 +79,10 @@ class PulseDetector:
         # Step 5: Calculate the adaptive threshold and detect peaks
         adaptive_threshold = np.median(wavelet_coefficients) + 2 * np.std(wavelet_coefficients)
         peaks, _ = find_peaks(wavelet_coefficients, height=adaptive_threshold)
-        self.detection_results["Wavelet Transform Detection"] = np.array(peaks, dtype=int)
+        
+        # Step 6: Store both peak indices (x) and corresponding amplitudes (y values)
+        peak_y_values = self.signal[peaks]  # get corresponding y values from original signal
+        self.detection_results["Wavelet Transform Detection"] = (peaks, peak_y_values)
 
     def short_time_energy_detection(self, window_size=10, step_size=5):
         # Step 1: Create a rolling window view into the signal for the given window size
