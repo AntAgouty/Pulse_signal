@@ -172,10 +172,15 @@ class PulseDetector:
         baseline_deviation = self.signal - baseline
         threshold = np.median(baseline_deviation) + 3 * np.std(baseline_deviation)
         filtered_results = {}
-        
+
         for method, detections in self.detection_results.items():
-            filtered_results[method] = np.array([p for p in detections if self.signal[p] > baseline[p] + threshold], dtype=int)
-        
+            # Ensure each detection point `p` is evaluated as a scalar.
+            if isinstance(detections, np.ndarray):
+                filtered_results[method] = np.array([p for p in detections if self.signal[int(p)] > baseline[int(p)] + threshold], dtype=int)
+            else:
+                # Handle cases where detections might not be an array
+                filtered_results[method] = detections
+
         self.detection_results = filtered_results
 
   # Consensus methods (Frequency and Clustering Consensus)
