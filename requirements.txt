@@ -9,3 +9,6 @@ nbformat
 PyWavelets
 pyarrow
 fastparquet
+KalmanFilter
+dask
+dask[distributed]

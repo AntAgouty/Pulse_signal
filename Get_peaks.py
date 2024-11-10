@@ -3,6 +3,7 @@ import bioread
 import pandas as pd
 from multiprocessing import Pool, Manager
 from Peaker import PulseDetector
+from Helper_functions import load_and_combine_parquet_files, average_the_values, apply_kalman_filter, parallel_kalman_filter
 
 # Define the directory containing the files
 file_directory = "data"
@@ -138,6 +139,25 @@ def save_results_to_parquet(results, batch_number):
         }).T.explode(['tok_wave_x', 'tok_wave_y'])
         tok_wavelet_df.to_parquet(f"results_tok_wavelet_batch_{batch_number}.parquet")
 
+def kalman_process():
+    directory_path = os.getcwd()
+    combined_results = load_and_combine_parquet_files(directory_path)
+
+    napetost_all_df = combined_results["napetost_all"]
+    napetost_wavelet_df = combined_results["napetost_wavelet"]
+    tok_all_df = combined_results["tok_all"]
+    tok_wavelet_df = combined_results["tok_wavelet"]
+
+    parallel_kalman_filter(napetost_all_df,y_col="napetost_y")
+    parallel_kalman_filter(napetost_wavelet_df,y_col="napetost_wave_y")
+    parallel_kalman_filter(tok_all_df,y_col="tok_y")
+    parallel_kalman_filter(tok_wavelet_df,y_col="tok_wave_y")
+
+    napetost_all_df.to_parquet("joined_napetost_all_df.parquet")
+    napetost_wavelet_df.to_parquet("joined_napetost_wavelet_df.parquet")
+    tok_all_df.to_parquet("joined_tok_all_df.parquet")
+    tok_wavelet_df.to_parquet("joined_tok_wavelet_df.parquet")
+
 def main():
     # Get list of all files in directory
     files = [f for f in os.listdir(file_directory) if f.endswith('.acq')]
@@ -169,6 +189,7 @@ def main():
             print(file_name)
     else:
         print("\nAll files were processed successfully.")
+    kalman_process()
 
 if __name__ == "__main__":
     main()
