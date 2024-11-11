@@ -195,4 +195,4 @@ def main(get_peaks = False, Kalman_smooth = False):
         kalman_process()
 
 if __name__ == "__main__":
-    main()
+    main(Kalman_smooth = True)
