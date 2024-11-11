@@ -143,7 +143,7 @@ def parallel_kalman_filter(df, y_col, new_col_name="kalman_filtered", npartition
     Returns:
     pd.DataFrame: DataFrame with Kalman-filtered values added as a new column.
     """
-    client = Client(processes=True)  # Use processes for better parallelization
+    client = Client(n_workers=12, threads_per_worker=1, processes=True)  # Use processes for better parallelization
 
     # Convert to Dask DataFrame and set the number of partitions
     ddf = dd.from_pandas(df, npartitions=npartitions)
