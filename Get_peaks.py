@@ -158,38 +158,41 @@ def kalman_process():
     tok_all_df.to_parquet("joined_tok_all_df.parquet")
     tok_wavelet_df.to_parquet("joined_tok_wavelet_df.parquet")
 
-def main():
-    # Get list of all files in directory
-    files = [f for f in os.listdir(file_directory) if f.endswith('.acq')]
+def main(get_peaks = False, Kalman_smooth = False):
+    if get_peaks == True:
+        # Get list of all files in directory
+        files = [f for f in os.listdir(file_directory) if f.endswith('.acq')]
 
-    # Shared list to track files that couldn't be processed
-    manager = Manager()
-    unprocessed_files = manager.list()
+        # Shared list to track files that couldn't be processed
+        manager = Manager()
+        unprocessed_files = manager.list()
 
-    # Use multiprocessing pool limited to 4 processes to process files in parallel
-    with Pool(processes=nu_threads) as pool:
-        # Pass `unprocessed_files` to each process so it can record failures
-        results = dict(pool.starmap(process_file, [(file, unprocessed_files) for file in files]))
+        # Use multiprocessing pool limited to 4 processes to process files in parallel
+        with Pool(processes=nu_threads) as pool:
+            # Pass `unprocessed_files` to each process so it can record failures
+            results = dict(pool.starmap(process_file, [(file, unprocessed_files) for file in files]))
 
-    # Save results in batches to Parquet
-    batch_number = 1
-    results_batch = {}
-    for i, (file_name, result) in enumerate(results.items()):
-        results_batch[file_name] = result
-        # Save batch when batch_size is reached
-        if (i + 1) % batch_size == 0 or i + 1 == len(results):
-            save_results_to_parquet(results_batch, batch_number)
-            results_batch.clear()  # Clear the batch dictionary for the next set
-            batch_number += 1
+        # Save results in batches to Parquet
+        batch_number = 1
+        results_batch = {}
+        for i, (file_name, result) in enumerate(results.items()):
+            results_batch[file_name] = result
+            # Save batch when batch_size is reached
+            if (i + 1) % batch_size == 0 or i + 1 == len(results):
+                save_results_to_parquet(results_batch, batch_number)
+                results_batch.clear()  # Clear the batch dictionary for the next set
+                batch_number += 1
 
-    # Print summary of unprocessed files
-    if unprocessed_files:
-        print("\nFiles that could not be analyzed:")
-        for file_name in unprocessed_files:
-            print(file_name)
-    else:
-        print("\nAll files were processed successfully.")
-    kalman_process()
+        # Print summary of unprocessed files
+        if unprocessed_files:
+            print("\nFiles that could not be analyzed:")
+            for file_name in unprocessed_files:
+                print(file_name)
+        else:
+            print("\nAll files were processed successfully.")
+
+    if Kalman_smooth == True:
+        kalman_process()
 
 if __name__ == "__main__":
     main()
