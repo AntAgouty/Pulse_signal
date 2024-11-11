@@ -12,3 +12,4 @@ fastparquet
 pykalman
 dask
 dask[distributed]
+openpyxl

@@ -148,16 +148,18 @@ def kalman_process():
     tok_all_df = combined_results["tok_all"]
     tok_wavelet_df = combined_results["tok_wavelet"]
 
-    parallel_kalman_filter(napetost_all_df,y_col="napetost_y")
-    parallel_kalman_filter(napetost_wavelet_df,y_col="napetost_wave_y")
-    parallel_kalman_filter(tok_all_df,y_col="tok_y")
-    parallel_kalman_filter(tok_wavelet_df,y_col="tok_wave_y")
+    # Apply Kalman filter and replace the DataFrames with their processed versions
+    napetost_all_df = parallel_kalman_filter(napetost_all_df, y_col="napetost_y")
+    napetost_wavelet_df = parallel_kalman_filter(napetost_wavelet_df, y_col="napetost_wave_y")
+    tok_all_df = parallel_kalman_filter(tok_all_df, y_col="tok_y")
+    tok_wavelet_df = parallel_kalman_filter(tok_wavelet_df, y_col="tok_wave_y")
 
+    # Save the processed DataFrames to Parquet files with the "kalman_filtered" column
     napetost_all_df.to_parquet("joined_napetost_all_df.parquet")
     napetost_wavelet_df.to_parquet("joined_napetost_wavelet_df.parquet")
     tok_all_df.to_parquet("joined_tok_all_df.parquet")
     tok_wavelet_df.to_parquet("joined_tok_wavelet_df.parquet")
-
+    
 def main(get_peaks = False, Kalman_smooth = False):
     if get_peaks == True:
         # Get list of all files in directory
