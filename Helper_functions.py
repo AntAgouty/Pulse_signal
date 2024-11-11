@@ -154,7 +154,7 @@ def parallel_kalman_filter(df, y_col, new_col_name="kalman_filtered", npartition
     pd.DataFrame: DataFrame with Kalman-filtered values added as a new column.
     """
     # Start Dask client with specified workers and threads
-    client = Client(n_workers=12, threads_per_worker=1, processes=True)
+    client = Client(n_workers=24, threads_per_worker=1, processes=True)
 
     # List to collect filenames of problematic files
     problematic_files = []
