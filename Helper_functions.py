@@ -112,21 +112,16 @@ def apply_kalman_filter_to_chunk(df_chunk, y_col, new_col_name="kalman_filtered"
     if problematic_files is None:
         problematic_files = []
 
-    # Initialize an empty list to hold smoothed data for each measurement
     smoothed_data = []
 
-    # Process each measurement (file) in the chunk
     for file_name in df_chunk.index.unique():
         try:
-            # Ensure file_data is a DataFrame for each unique file
             file_data = df_chunk.loc[file_name].copy()
             y_values = file_data[y_col].values
 
-            # Initialize and train Kalman filter
             kf = KalmanFilter(initial_state_mean=y_values[0], n_dim_obs=1)
             kf = kf.em(y_values, n_iter=n_iter)
 
-            # Smooth the data
             smoothed_state_means, _ = kf.smooth(y_values)
             file_data[new_col_name] = smoothed_state_means.flatten()
 
@@ -136,7 +131,6 @@ def apply_kalman_filter_to_chunk(df_chunk, y_col, new_col_name="kalman_filtered"
             print(f"Error processing file {file_name}: {e}")
             problematic_files.append(file_name)
 
-    # Concatenate the processed data for each measurement
     return pd.concat(smoothed_data), problematic_files
 
 def parallel_kalman_filter(df, y_col, new_col_name="kalman_filtered", npartitions=4, n_iter=5):
@@ -153,38 +147,27 @@ def parallel_kalman_filter(df, y_col, new_col_name="kalman_filtered", npartition
     Returns:
     pd.DataFrame: DataFrame with Kalman-filtered values added as a new column.
     """
-    # Start Dask client with specified workers and threads
-    client = Client(n_workers=24, threads_per_worker=1, processes=True)
+    client = Client(n_workers=16, threads_per_worker=1, processes=True)
 
-    # List to collect filenames of problematic files
     problematic_files = []
-
-    # Convert to Dask DataFrame and set the number of partitions
     ddf = dd.from_pandas(df, npartitions=npartitions)
 
-    # Define Dask delayed tasks for each partition
     delayed_results = [
         delayed(apply_kalman_filter_to_chunk)(chunk, y_col, new_col_name, n_iter, problematic_files)
         for chunk in ddf.to_delayed()
     ]
 
-    # Compute all partitions in parallel and collect results
     results = compute(*delayed_results)
-
-    # Shut down Dask client after computation
     client.shutdown()
 
-    # Separate processed DataFrames and problematic files
     data_frames, problematic_files_lists = zip(*results)
     problematic_files = [file for sublist in problematic_files_lists for file in sublist]
 
-    # Concatenate results into a single DataFrame
     final_df = pd.concat(data_frames, axis=0)
 
-    # Print and log problematic files
     if problematic_files:
         print("\nFiles with issues during Kalman filtering:")
-        for file_name in set(problematic_files):  # Use set to remove duplicates
+        for file_name in set(problematic_files):
             print(file_name)
 
     return final_df
